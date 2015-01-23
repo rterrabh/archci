@@ -2,57 +2,39 @@ package com.archci.util;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.eclipse.core.resources.IFile;
-import org.eclipse.core.resources.IFolder;
-import org.eclipse.core.resources.IProject;
-import org.eclipse.core.resources.IResource;
-import org.eclipse.core.resources.IResourceVisitor;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.core.runtime.IPath;
-import org.eclipse.jdt.core.ICompilationUnit;
-import org.eclipse.jdt.core.IJavaProject;
-import org.eclipse.jdt.core.IPackageDeclaration;
-import org.eclipse.jdt.core.IPackageFragmentRoot;
-import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.ITypeHierarchy;
 import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.JavaModelException;
-//import org.eclipse.jface.dialogs.MessageDialog;
-//import org.eclipse.swt.widgets.Shell;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.AbstractTypeDeclaration;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.PackageDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jface.text.Document;
 
 //import com.archci.builder.DCLBuilder;
 import com.archci.dependencies.Dependency;
 import com.archci.exception.DCLException;
 import com.archci.exception.ParseException;
+//import org.eclipse.jface.dialogs.MessageDialog;
+//import org.eclipse.swt.widgets.Shell;
 
 public final class DCLUtil {
 	public static final String NOME_APLICACAO = ".: archici :.";
@@ -206,6 +188,20 @@ public final class DCLUtil {
 		return sourceEntriesPath;
 	}
 	
+	public static File getDCLFile(File projectPath){
+		Stack<File> stack = new Stack<File>();
+		stack.push(projectPath);
+			while(!stack.isEmpty()) {
+				File child = stack.pop();
+				if (child.isDirectory()) {
+				  for(File f : child.listFiles())
+					  stack.push(f);
+				} else if (child.isFile() && child.getName().endsWith(".dcl"))
+					return child;				
+			}
+		return null;
+	}
+	
 	/**
 	 * DCL2 Adjust the name of the class to make the identification easier It is
 	 * done by converting all "/" to "."
@@ -241,8 +237,9 @@ public final class DCLUtil {
 	 *         <code>false</code> otherwise.
 	 */
 
-//VERIFICA SE O IRESOURCE PASSADO EH UM CODIGO JAVA
-
+	//VERIFICA SE O IRESOURCE PASSADO EH UM CODIGO JAVA
+	//DESATIVADO POR ORA
+	/*
 	public static boolean isJavaFile(IResource resource) {
 		if (resource == null || (resource.getType() != IResource.FILE)) {
 			return false;
@@ -250,6 +247,7 @@ public final class DCLUtil {
 		String ex = resource.getFileExtension();
 		return "java".equalsIgnoreCase(ex); //$NON-NLS-1$
 	}
+	*/
 
 	/**
 	 * DCL2 Checks whether the given resource is a Java class file.
@@ -259,8 +257,9 @@ public final class DCLUtil {
 	 * @return <code>true</code> if the given resource is a class file,
 	 *         <code>false</code> otherwise.
 	 */
-//VERIFICA SE O IRESOURCE PASSADO EH UM CLASS JAVA
-
+	//VERIFICA SE O IRESOURCE PASSADO EH UM CLASS JAVA
+	//DESATIVADO POR ORA
+	/*
 	public static boolean isClassFile(IResource resource) {
 		if (resource == null || (resource.getType() != IResource.FILE)) {
 			return false;
@@ -269,7 +268,8 @@ public final class DCLUtil {
 		return "class".equalsIgnoreCase(ex); //$NON-NLS-1$
 
 	}
-
+	*/
+	
 	/**
 	 * DCL2 Returns all class files inside a specific folder
 	 * 
@@ -278,9 +278,9 @@ public final class DCLUtil {
 	 * @return List of class files
 	 * @throws CoreException
 	 */
-
-//RETORNA TODAS AS CLASSES (IFILE) JAVA DENTRO DE UMA PASTA
-
+	//RETORNA TODAS AS CLASSES (IFILE) JAVA DENTRO DE UMA PASTA
+	//DESATIVADO POR ORA
+	/*
 	public static Collection<IFile> getAllClassFiles(IFolder folder) throws CoreException {
 		Collection<IFile> projectClassResources = new HashSet<IFile>();
 
@@ -294,6 +294,7 @@ public final class DCLUtil {
 
 		return projectClassResources;
 	}
+	*/
 
 	/**
 	 * DCL2 Returns all class files inside the project
@@ -301,38 +302,107 @@ public final class DCLUtil {
 	 * @param project
 	 *            Java Project
 	 * @return List of class files
+	 * @throws IOException 
 	 * @throws CoreException
 	 */
-	
-//RETORNA TODAS AS CLASSES (IFILE) JAVA DENTRO DE UM PROJETO
-
+	//RETORNA TODAS AS CLASSES (IFILE) JAVA DENTRO DE UM PROJETO
+	//DESATIVADO POR ORA
+	/*
 	public static Collection<IFile> getAllClassFiles(IProject project) throws CoreException {
 		IJavaProject javaProject = JavaCore.create(project);
 		IPath binDir = javaProject.getOutputLocation();
 		return DCLUtil.getAllClassFiles(project.getFolder(binDir.removeFirstSegments(1)));
 	}
+	*/
 
-	public static Collection<String> getClassNames(final IProject project) throws CoreException {
-		final Collection<String> result = new LinkedList<String>();
-		project.accept(new IResourceVisitor() {
+	//RETORNA O NOME DA CLASSE DE UM ARQUIVO JAVA
+	public static String getClassName(File javaFile) throws IOException {
+		String source = FileUtils.readFileToString(javaFile);
+	    Document document = new Document(source);
+	    
+	    ASTParser parser = ASTParser.newParser(AST.JLS4);
+	    
+	    @SuppressWarnings("unchecked")
+		Map<String, String> options = JavaCore.getDefaultOptions();
+		options.put(JavaCore.COMPILER_COMPLIANCE, JavaCore.VERSION_1_8);
+		options.put(JavaCore.COMPILER_CODEGEN_TARGET_PLATFORM,
+				JavaCore.VERSION_1_8);
+		options.put(JavaCore.COMPILER_SOURCE, JavaCore.VERSION_1_8);
+	    parser.setCompilerOptions(options);
+	    
+	    parser.setKind(ASTParser.K_COMPILATION_UNIT);
+	    parser.setSource(document.get().toCharArray());
+	    parser.setResolveBindings(true);
+	    
+	    //parser.setEnvironment(classPath, sourcePath, encodings, true);
+	    parser.setUnitName("Dependency-Tool");
+	    parser.setBindingsRecovery(true);
+	    
+	    CompilationUnit cUnit = (CompilationUnit) parser.createAST(null);
+	    PackageDeclaration classPackage = cUnit.getPackage();
+		
+		String pack;
+		if (classPackage!=null)
+			pack = classPackage.getName() + ".";
+		else
+			pack = "";
 
-			@Override
-			public boolean visit(IResource resource) {
-				if (resource instanceof IFile && resource.getName().endsWith(".java")) {
-					ICompilationUnit unit = ((ICompilationUnit) JavaCore.create((IFile) resource));
-					if (unit.isOpen()){
-						final String className = DCLUtil.getClassName(unit);
-						result.add(className);
-						return true;
-					}
-				}
-				return false;
-				
-			}
-		});
-		return result;
+		String clazz = FilenameUtils.removeExtension(javaFile.getName());
+
+		return pack + clazz;
 	}
 
+	//RETORNA UM COLLECTION DE STRING COM AS CLASSES DO UM DIRETORIO DE PROJETO
+	public static Collection<String> getClassNames(final File projectPath) throws CoreException, IOException {
+		final Collection<String> result = new LinkedList<String>();
+		
+		Stack<File> stack = new Stack<File>();
+		stack.push(projectPath);
+			while(!stack.isEmpty()) {
+				File child = stack.pop();
+				if (child.isDirectory()) {
+				  for(File f : child.listFiles())
+					  stack.push(f);
+				} else if (child.isFile() && child.getName().endsWith(".java")) {
+					result.add(DCLUtil.getClassName(child));
+				}
+			}
+		return result;
+	}
+	
+	//METODO ALTERNATIVO PARA PEGAR NOME DAS CLASSES DE UM PROJETO -- DESATIVADO POR ORA
+	// TODO: VERIFICAR QUAL DOS DOIS METODOS EH MAIS EFICIENTE
+	/*
+	public static Collection<String> getClassNames(final File projectPath) throws CoreException, IOException {
+		final Collection<String> result = new LinkedList<String>();
+		
+		Stack<File> stack = new Stack<File>();
+		stack.push(projectPath);
+			while(!stack.isEmpty()) {
+				File child = stack.pop();
+				if (child.isDirectory()) {
+				  for(File f : child.listFiles())
+					  stack.push(f);
+				} else if (child.isFile() && child.getName().endsWith(".java")) {
+					File aux = child;
+					String s="";
+					String clazz="";
+					
+					while(!aux.getParentFile().getName().endsWith("src")){
+						s = aux.getParentFile().getName()+"."+s;
+						aux = aux.getParentFile();
+					}
+					clazz = s+child.getName();
+					result.add(clazz.substring(0, clazz.indexOf(".java")));
+				}
+			}
+		return result;
+	}
+	*/
+	
+	//RETORNA UM COLLECTION DE IFILE DO IPROJECT
+	//NAO UTILIZADO MAIS
+	/*
 	@Deprecated
 	public static Collection<IFile> getJavaClasses(final IProject project) throws CoreException {
 		final Collection<IFile> result = new LinkedList<IFile>();
@@ -348,6 +418,7 @@ public final class DCLUtil {
 		});
 		return result;
 	}
+	 */
 
 	/**
 	 * DCL2 The method returns the respective IFile of a java source file
@@ -361,16 +432,16 @@ public final class DCLUtil {
 	 * @return Class IFile resource
 	 * @throws JavaModelException
 	 */
-	
 	//RETORNA O IFILE DE UM IJAVAPROJECT, INFORMANDO O NOME DA CLASSE
-	
+	//NAO NECESSARIO POR ORA
+	/*
 	public static IFile getFileFromClassName(IJavaProject javaProject, final String className) throws JavaModelException {
 		for (IPackageFragmentRoot folder : javaProject.getAllPackageFragmentRoots()) {
 			if (folder.getKind() == IPackageFragmentRoot.K_SOURCE) {
 				IPath path = folder.getPath();
 				path = path.removeFirstSegments(1);
 
-				/* If was internal class, consider the parent class */
+				// If was internal class, consider the parent class
 				if (className.contains("$")) {
 					path = path.append(className.substring(0, className.indexOf('$')).replaceAll("[.]", "" + IPath.SEPARATOR) + ".java");
 				} else {
@@ -386,16 +457,14 @@ public final class DCLUtil {
 		}
 		return null;
 	}
+	*/
 
 	/**
 	 * DCL2 Method responsible to log error
 	 * 
 	 */
-	
 	//CRIA LOG DE ERRO -- DESATIVADO POR ORA
-
 	/*
-	
 	public static String logError(IProject project, Throwable thrownExeption) {
 		if (project == null) {
 			throw new NullPointerException("project cant be null");
@@ -430,7 +499,6 @@ public final class DCLUtil {
 	 */
 	
 	//RETORNA DEFINICAO DE MODULOS DO JAVA API ??? 
-	
 	public static String getJavaModuleDefinition() {
 		return "java.**,javax.**,org.ietf.jgss.**,org.omg.**,org.w3c.dom.**,org.xml.sax.**,boolean,char,short,byte,int,float,double,void";
 	}
@@ -442,9 +510,7 @@ public final class DCLUtil {
 	 *            Name of the class
 	 * @return true if it is, no otherwise
 	 */
-	
 	//VERIFICA SE UM CLASSNAME ESTA CONTIDO NO JAVA API
-	
 	public static boolean isFromJavaAPI(final String className) {
 		for (String javaModulePkg : getJavaModuleDefinition().split(",")) {
 			String prefix = javaModulePkg.substring(0, javaModulePkg.indexOf(".**"));
@@ -569,15 +635,12 @@ public final class DCLUtil {
 	 * @param shell
 	 * @param message
 	 */
-	
 	//EXIBE MENSAGEM --DESATIVADO POR ORA
-	
 	/*
-	
 	public static void showMessage(Shell shell, String message) {
 		MessageDialog.openInformation(shell, NOME_APLICACAO, message);
 	}
-*/
+	 */
 	
 	/**
 	 * DCL2 Show an error
@@ -585,14 +648,12 @@ public final class DCLUtil {
 	 * @param shell
 	 * @param message
 	 */
-	
 	//EXIBE ERRO --DESATIVADO POR ORA
 	/*
-	
 	public static void showError(Shell shell, String message) {
 		MessageDialog.openError(shell, NOME_APLICACAO, message);
 	}
-*/
+	 */
 	
 	/**
 	 * DCL2 Returns all dependencies from the class class
@@ -601,6 +662,8 @@ public final class DCLUtil {
 	 *            List of classes
 	 * @return List of dependencies
 	 */
+	//NAO MAIS UTILIZADO
+	/*
 	@Deprecated
 	public static Collection<Dependency> getDependenciesUsingASM(IFile file) throws CoreException, IOException {
 		/*
@@ -620,9 +683,10 @@ public final class DCLUtil {
 		 * cr.accept(cv, 0); dependencies.addAll(cv.getDependencies());
 		 * 
 		 * return dependencies;
-		 */
-		return null;
-	}
+		 *
+		* return null;
+	* }
+*/
 
 	/**
 	 * DCL2 Returns all dependencies from the class class
@@ -632,7 +696,7 @@ public final class DCLUtil {
 	 * @return List of dependencies
 	 */
 	
-	//RETORNA TODAS AS DEPENDENCIAS - MODIFICADO
+	//RETORNA TODAS AS DEPENDENCIAS
 	public static Collection<Dependency> getDependenciesUsingAST(File f, List<String> classpath, List<String> sourcepath) throws CoreException, IOException, DCLException {
 		final Collection<Dependency> dependencies = new LinkedList<Dependency>();
 		
@@ -644,15 +708,78 @@ public final class DCLUtil {
 		dependencies.addAll(cv.getDependencies());
 		return dependencies;
 	}
-
-
+	
+	
+	public static CompilationUnit getCompilationUnitFromAST(File file, String[] classPath, String[] sourcePath) throws IOException{
+		String[] encodings = new String[sourcePath.length];
+		for(int i=0; i < sourcePath.length; i++){
+			encodings[i] = "UTF-8";
+		}
+		
+		String source = FileUtils.readFileToString(file);
+	    Document document = new Document(source);
+	    
+	    ASTParser parser = ASTParser.newParser(AST.JLS4);
+	    
+	    @SuppressWarnings("unchecked")
+		Map<String, String> options = JavaCore.getDefaultOptions();
+		options.put(JavaCore.COMPILER_COMPLIANCE, JavaCore.VERSION_1_8);
+		options.put(JavaCore.COMPILER_CODEGEN_TARGET_PLATFORM,
+				JavaCore.VERSION_1_8);
+		options.put(JavaCore.COMPILER_SOURCE, JavaCore.VERSION_1_8);
+	    parser.setCompilerOptions(options);
+	    
+	    parser.setKind(ASTParser.K_COMPILATION_UNIT);
+	    parser.setSource(document.get().toCharArray());
+	    parser.setResolveBindings(true);
+	    
+	    parser.setEnvironment(classPath, sourcePath, encodings, true);
+	    parser.setUnitName("Dependency-Tool");
+	    parser.setBindingsRecovery(true);
+	    
+	    return (CompilationUnit) parser.createAST(null);
+	}
+	
+	public static Set<ITypeBinding> getSubTypes(CompilationUnit cUnit, String desc){
+		Set<ITypeBinding> subTypes = new HashSet<ITypeBinding>();
+		
+		List<AbstractTypeDeclaration> types = cUnit.types();			
+		TypeDeclaration typeDeclaration = (TypeDeclaration) types.get(0);
+		ITypeBinding typeBind = typeDeclaration.resolveBinding();
+		
+		if(typeBind.getQualifiedName().equals(desc)){
+			subTypes.addAll(Arrays.asList(typeBind.getDeclaredTypes()));
+		}
+		else{
+			Set<ITypeBinding> superTypeBind = new HashSet<ITypeBinding>();
+			
+			ITypeBinding superclass = typeBind.getSuperclass();
+			boolean superMatch=false;
+			
+			while(superclass!=null && !superMatch){ 
+				superTypeBind.add(superclass);
+				superclass = superclass.getSuperclass();
+				if(!superclass.getQualifiedName().equals(desc)) 
+					superMatch= true;
+			}
+			
+			if(superMatch) subTypes.addAll(superTypeBind);
+			
+			ITypeBinding[] interfaceBinds = typeBind.getInterfaces();
+			
+			subTypes.addAll(Arrays.asList(interfaceBinds));
+		}
+			
+		return subTypes;
+	}
 
 	/**
 	 * Checks if a specific class is contained in a list of classes, RE or
 	 * packages
 	 */
 	public static boolean hasClassNameByDescription(final String className, final String moduleDescription,
-			final Map<String, String> modules, final Collection<String> projectClassNames, final IProject project) {
+			final Map<String, String> modules, final Collection<String> projectClassNames, final File projectPath) {
+		
 		for (String desc : moduleDescription.split(",")) {
 			desc = desc.trim();
 
@@ -666,7 +793,7 @@ public final class DCLUtil {
 				 * If it's a module, call again the same method to return with
 				 * its description
 				 */
-				if (hasClassNameByDescription(className, modules.get(desc), modules, projectClassNames, project)) {
+				if (hasClassNameByDescription(className, modules.get(desc), modules, projectClassNames, projectPath)) {
 					return true;
 				}
 			} else if (desc.endsWith("**")) {
@@ -688,28 +815,50 @@ public final class DCLUtil {
 					return true;
 				}
 			} else if (desc.endsWith("+")) {
+				//TODO: VERIFICAR SE EXISTE UM MEIO MENOS "CUSTOSO" DE FAZER O PROCEDIMENTO A SEGUIR
+				
 				/* If it refers to subtypes */
 				desc = desc.substring(0, desc.length() - 1);
+				Set<ITypeBinding> listSubTypes = new HashSet<ITypeBinding>();
 
 				try {
-					IJavaProject javaProject = JavaCore.create(project);
-					IType type = javaProject.findType(desc);
-
-					ITypeHierarchy typeHierarchy = type.newTypeHierarchy(null);
-					IType[] typeSubclasses = typeHierarchy.getAllSubtypes(type);
+					
+					List<String> classPath = new ArrayList<String>();
+					List<String> sourcePath = new ArrayList<String>();
+					
+					classPath.addAll(getPath(projectPath));
+					sourcePath.addAll(getSource(projectPath));
+					
+					String[] classpathEntries = classPath.toArray(new String[classPath.size()]);
+					String[] sourcepathEntries = sourcePath.toArray(new String[sourcePath.size()]);
+					
+					Stack<File> stack = new Stack<File>();
+					stack.push(projectPath);
+						loop: while(!stack.isEmpty()) {
+							File child = stack.pop();
+							if (child.isDirectory()) {
+							  for(File f : child.listFiles())
+								  stack.push(f);
+							} else if (child.isFile() && child.getName().endsWith(".java")) {
+								listSubTypes = getSubTypes(
+										getCompilationUnitFromAST(child, classpathEntries, sourcepathEntries),
+										desc);
+								
+							}
+						}
 
 					StringBuilder strBuilder = new StringBuilder();
-					for (IType t : typeSubclasses) {
-						strBuilder.append(t.getFullyQualifiedName() + ",");
+					for (ITypeBinding t : listSubTypes) {
+						strBuilder.append(t.getQualifiedName() + ",");
 					}
 					if (strBuilder.length() > 0) {
 						strBuilder.deleteCharAt(strBuilder.length() - 1);
 					}
 					modules.put(desc + "+", strBuilder.toString());
-					if (hasClassNameByDescription(className, modules.get(desc + "+"), modules, projectClassNames, project)) {
+					if (hasClassNameByDescription(className, modules.get(desc + "+"), modules, projectClassNames, projectPath)) {
 						return true;
 					}
-				} catch (JavaModelException e) {
+				} catch (IOException | ParseException | CoreException | DCLException e) {
 					e.printStackTrace();
 				}
 			} else {
@@ -722,25 +871,7 @@ public final class DCLUtil {
 
 		return false;
 	}
-
-	public static String getClassName(ICompilationUnit unit) {
-		try {
-			IPackageDeclaration packages[] = unit.getPackageDeclarations();
-			String pack;
-			if (packages.length > 0)
-				pack = packages[0].getElementName() + ".";
-			else
-				pack = "";
-
-			String clazz = unit.getElementName();
-			clazz = clazz.substring(0, clazz.indexOf(".java"));
-
-			return pack + clazz;
-		} catch (JavaModelException e) {
-			return null;
-		}
-	}
-
+	
 	public static String getPackageFromClassName(final String className) {
 		if (className.contains(".")) {
 			return className.substring(0, className.lastIndexOf('.'));

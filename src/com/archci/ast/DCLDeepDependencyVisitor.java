@@ -1,12 +1,19 @@
 package com.archci.ast;
 
 import java.io.File;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
@@ -35,6 +42,7 @@ import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
+import org.eclipse.jdt.internal.core.JavaElement;
 import org.eclipse.jface.text.Document;
 
 import com.archci.dependencies.AccessFieldDependency;
@@ -58,6 +66,7 @@ import com.archci.dependencies.ImplementDirectDependency;
 import com.archci.dependencies.ImplementIndirectDependency;
 import com.archci.dependencies.ThrowDependency;
 import com.archci.exception.DCLException;
+import com.archci.util.DCLUtil;
 
 public class DCLDeepDependencyVisitor extends ASTVisitor {
 	private List<Dependency> dependencies;
@@ -71,36 +80,8 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 			
 			this.dependencies = new ArrayList<Dependency>();
 			this.className = FilenameUtils.removeExtension(file.getName());
-			
-			String[] encodings = new String[sourcePath.length];
-			for(int i=0; i < sourcePath.length; i++){
-				encodings[i] = "UTF-8";
-			}
-			
-			String source = FileUtils.readFileToString(file);
-		    Document document = new Document(source);
 		    
-		    ASTParser parser = ASTParser.newParser(AST.JLS4);
-		    
-		    @SuppressWarnings("unchecked")
-			Map<String, String> options = JavaCore.getDefaultOptions();
-			options.put(JavaCore.COMPILER_COMPLIANCE, JavaCore.VERSION_1_8);
-			options.put(JavaCore.COMPILER_CODEGEN_TARGET_PLATFORM,
-					JavaCore.VERSION_1_8);
-			options.put(JavaCore.COMPILER_SOURCE, JavaCore.VERSION_1_8);
-		    parser.setCompilerOptions(options);
-		    
-		    //parser.setCompilerOptions(JavaCore.getOptions());
-		    
-		    parser.setKind(ASTParser.K_COMPILATION_UNIT);
-		    parser.setSource(document.get().toCharArray());
-		    parser.setResolveBindings(true);
-		    
-		    parser.setEnvironment(classPath, sourcePath, encodings, true);
-		    parser.setUnitName("Dependency-Tool");
-		    parser.setBindingsRecovery(true);
-		    
-		    fullClass = (CompilationUnit) parser.createAST(null);
+		    fullClass = DCLUtil.getCompilationUnitFromAST(file, classPath, sourcePath);
 		    
 		    this.fullClass.accept(this);
 		    
@@ -130,12 +111,17 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 				TypeDeclaration typeDeclaration  = (TypeDeclaration) types.get(0);
 				ITypeBinding typeBind = typeDeclaration.resolveBinding();
 				
-				List<ITypeBinding> superTypeBind = new ArrayList<ITypeBinding>();
+				Set<ITypeBinding> superTypeBind = new HashSet<ITypeBinding>();
+				Set<ITypeBinding> interfaceBinds = new HashSet<ITypeBinding>();
 				
 				ITypeBinding superclass = typeBind.getSuperclass();
 				
+				//TODO: TESTAR INTERFACES INDIRETAS
+				
 				while(superclass!=null){ 
 					superTypeBind.add(superclass);
+					ITypeBinding[] indirectInterfaceBinds = superclass.getInterfaces();
+					interfaceBinds.addAll(Arrays.asList(indirectInterfaceBinds));
 					superclass = superclass.getSuperclass();
 				}
 
@@ -151,10 +137,11 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 				}
 
 				//List<ITypeBinding> superInterfaceBind = new ArrayList<ITypeBinding>();
-				List<ITypeBinding> interfaceBinds = new ArrayList<ITypeBinding>();
 				ITypeBinding[] directInterfaceBinds = typeBind.getInterfaces();
 				
-				while(directInterfaceBinds.length!=0){
+				interfaceBinds.addAll(Arrays.asList(directInterfaceBinds));
+				
+				/*while(directInterfaceBinds.length!=0){
 					
 					for (ITypeBinding di : directInterfaceBinds){
 						interfaceBinds.add(di);
@@ -163,7 +150,7 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 					for (ITypeBinding dii : interfaceBinds){
 						directInterfaceBinds = dii.getInterfaces();
 					}
-				}
+				}*/
 
 				
 				//ITypeBinding[] interfaceBinds = typeBind.getInterfaces();
