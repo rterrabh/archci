@@ -1,6 +1,5 @@
 package com.archci.dependencies;
 
-import com.archci.dependencies.ImplementDependency;
 
 public final class ImplementDirectDependency extends ImplementDependency {
 

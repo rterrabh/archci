@@ -1,6 +1,5 @@
 package com.archci.dependencies;
 
-import com.archci.dependencies.AnnotateDependency;
 
 public final class AnnotateClassDependency extends AnnotateDependency {
 	

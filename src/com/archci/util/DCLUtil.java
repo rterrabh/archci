@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -22,25 +21,23 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
-import org.eclipse.jdt.core.dom.AbstractTypeDeclaration;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.PackageDeclaration;
-import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jface.text.Document;
 
-//import com.archci.builder.DCLBuilder;
-import com.archci.dependencies.Dependency;
+import com.archci.ast.DCLDeepDependencyVisitor;
 import com.archci.exception.DCLException;
 import com.archci.exception.ParseException;
 //import org.eclipse.jface.dialogs.MessageDialog;
 //import org.eclipse.swt.widgets.Shell;
+//import com.archci.builder.DCLBuilder;
 
 public final class DCLUtil {
 	public static final String NOME_APLICACAO = ".: archici :.";
 	public static final String DC_FILENAME = "architecture.dcl";
 	public static final String DCLDATA_FOLDER = "dcldata";
-
+	
 	private DCLUtil() {
 	}
 
@@ -61,10 +58,9 @@ public final class DCLUtil {
 	public static Collection<String> getPathFromFile(File classpath) throws IOException{
 		Collection<String> classEntriesPathFromFile = new LinkedList<String>();
 		
-		BufferedReader br = null;
 		String sCurrentLine;
 		 
-		br = new BufferedReader(new FileReader(classpath));
+		BufferedReader br = new BufferedReader(new FileReader(classpath));
 
 		while ((sCurrentLine = br.readLine()) != null) {
 			Pattern findPath = Pattern.compile("\\bpath=\"(.*?)\"");
@@ -81,7 +77,6 @@ public final class DCLUtil {
 						classEntriesPathFromFile.add(result);
 					}
 					else {
-						String test = classpath.getParentFile().getAbsolutePath()+"/"+result;
 						classEntriesPathFromFile.add(classpath.getParentFile().getAbsolutePath()+"/"+result);
 					}
 				}
@@ -96,7 +91,6 @@ public final class DCLUtil {
 	public static Collection<String> getPath(File folder) throws IOException, ParseException, CoreException, DCLException{
 		Collection<String> classEntriesPath = new LinkedList<String>();
 		
-		boolean isAPluginProject = false;
 		boolean foundClasspathFile=false;
 		
 		Stack<File> stack3 = new Stack<File>();
@@ -130,7 +124,8 @@ public final class DCLUtil {
 		}
 		
 		//PARA PLUG-INS
-		/*if (isAPluginProject){
+		/*boolean isAPluginProject = false;
+		  if (isAPluginProject){
 			String path = "/Users/arthurfp/Downloads/eclipse/plugins/";
 			File folder2 = new File(path);
 				
@@ -316,29 +311,7 @@ public final class DCLUtil {
 	*/
 
 	//RETORNA O NOME DA CLASSE DE UM ARQUIVO JAVA
-	public static String getClassName(File javaFile) throws IOException {
-		String source = FileUtils.readFileToString(javaFile);
-	    Document document = new Document(source);
-	    
-	    ASTParser parser = ASTParser.newParser(AST.JLS4);
-	    
-	    @SuppressWarnings("unchecked")
-		Map<String, String> options = JavaCore.getDefaultOptions();
-		options.put(JavaCore.COMPILER_COMPLIANCE, JavaCore.VERSION_1_8);
-		options.put(JavaCore.COMPILER_CODEGEN_TARGET_PLATFORM,
-				JavaCore.VERSION_1_8);
-		options.put(JavaCore.COMPILER_SOURCE, JavaCore.VERSION_1_8);
-	    parser.setCompilerOptions(options);
-	    
-	    parser.setKind(ASTParser.K_COMPILATION_UNIT);
-	    parser.setSource(document.get().toCharArray());
-	    parser.setResolveBindings(true);
-	    
-	    //parser.setEnvironment(classPath, sourcePath, encodings, true);
-	    parser.setUnitName("Dependency-Tool");
-	    parser.setBindingsRecovery(true);
-	    
-	    CompilationUnit cUnit = (CompilationUnit) parser.createAST(null);
+	public static String getClassName(CompilationUnit cUnit, File f) throws IOException {
 	    PackageDeclaration classPackage = cUnit.getPackage();
 		
 		String pack;
@@ -347,14 +320,14 @@ public final class DCLUtil {
 		else
 			pack = "";
 
-		String clazz = FilenameUtils.removeExtension(javaFile.getName());
+		String clazz = FilenameUtils.removeExtension(f.getName());
 
 		return pack + clazz;
 	}
 
-	//RETORNA UM COLLECTION DE STRING COM AS CLASSES DO UM DIRETORIO DE PROJETO
-	public static Collection<String> getClassNames(final File projectPath) throws CoreException, IOException {
-		final Collection<String> result = new LinkedList<String>();
+	//RETORNA UM COLLECTION DE STRING COM OS ARQUIVOS(FILES) DO UM DIRETORIO DE PROJETO
+	public static Collection<File> getFilesFromProject(final File projectPath) throws CoreException, IOException {
+		final Collection<File> result = new LinkedList<File>();
 		
 		Stack<File> stack = new Stack<File>();
 		stack.push(projectPath);
@@ -364,7 +337,7 @@ public final class DCLUtil {
 				  for(File f : child.listFiles())
 					  stack.push(f);
 				} else if (child.isFile() && child.getName().endsWith(".java")) {
-					result.add(DCLUtil.getClassName(child));
+					result.add(child);
 				}
 			}
 		return result;
@@ -498,7 +471,7 @@ public final class DCLUtil {
 	 * @return $java DCL constraint
 	 */
 	
-	//RETORNA DEFINICAO DE MODULOS DO JAVA API ??? 
+	//RETORNA DEFINICAO DE MODULOS DO JAVA API 
 	public static String getJavaModuleDefinition() {
 		return "java.**,javax.**,org.ietf.jgss.**,org.omg.**,org.w3c.dom.**,org.xml.sax.**,boolean,char,short,byte,int,float,double,void";
 	}
@@ -694,25 +667,20 @@ public final class DCLUtil {
 	 * @param classes
 	 *            List of classes
 	 * @return List of dependencies
+	 * @throws ParseException 
 	 */
 	
-	//RETORNA TODAS AS DEPENDENCIAS
-	public static Collection<Dependency> getDependenciesUsingAST(File f, List<String> classpath, List<String> sourcepath) throws CoreException, IOException, DCLException {
-		final Collection<Dependency> dependencies = new LinkedList<Dependency>();
-		
-		String[] classpathEntries = classpath.toArray(new String[classpath.size()]);
-		String[] sourcepathEntries = sourcepath.toArray(new String[sourcepath.size()]);
-		
-		com.archci.ast.DCLDeepDependencyVisitor cv = new com.archci.ast.DCLDeepDependencyVisitor(f, classpathEntries, sourcepathEntries);
-
-		dependencies.addAll(cv.getDependencies());
-		return dependencies;
+	//RETORNA TODOS OS OBJETOS DODCLDEEPDEPENDENCYVISITOR (AST)
+	public static DCLDeepDependencyVisitor useAST(File f, String[] classPathEntries, String[] sourcePathEntries) throws CoreException, IOException, DCLException, ParseException {
+		return new DCLDeepDependencyVisitor(f, classPathEntries, sourcePathEntries);
 	}
 	
 	
-	public static CompilationUnit getCompilationUnitFromAST(File file, String[] classPath, String[] sourcePath) throws IOException{
-		String[] encodings = new String[sourcePath.length];
-		for(int i=0; i < sourcePath.length; i++){
+	public static CompilationUnit getCompilationUnitFromAST(File file, String[] classPathEntries, String[] sourcePathEntries) throws IOException{
+	
+		
+		String[] encodings = new String[sourcePathEntries.length];
+		for(int i=0; i < sourcePathEntries.length; i++){
 			encodings[i] = "UTF-8";
 		}
 		
@@ -733,43 +701,50 @@ public final class DCLUtil {
 	    parser.setSource(document.get().toCharArray());
 	    parser.setResolveBindings(true);
 	    
-	    parser.setEnvironment(classPath, sourcePath, encodings, true);
+	    parser.setEnvironment(classPathEntries, sourcePathEntries, encodings, true);
 	    parser.setUnitName("Dependency-Tool");
 	    parser.setBindingsRecovery(true);
 	    
 	    return (CompilationUnit) parser.createAST(null);
 	}
 	
-	public static Set<ITypeBinding> getSubTypes(CompilationUnit cUnit, String desc){
+	public static Set<ITypeBinding> getSubTypes(List<ITypeBinding> typeBindings, String desc){
 		Set<ITypeBinding> subTypes = new HashSet<ITypeBinding>();
 		
-		List<AbstractTypeDeclaration> types = cUnit.types();			
-		TypeDeclaration typeDeclaration = (TypeDeclaration) types.get(0);
-		ITypeBinding typeBind = typeDeclaration.resolveBinding();
-		
-		if(typeBind.getQualifiedName().equals(desc)){
-			subTypes.addAll(Arrays.asList(typeBind.getDeclaredTypes()));
-		}
-		else{
-			Set<ITypeBinding> superTypeBind = new HashSet<ITypeBinding>();
+		for (ITypeBinding typeBind : typeBindings){
 			
-			ITypeBinding superclass = typeBind.getSuperclass();
-			boolean superMatch=false;
-			
-			while(superclass!=null && !superMatch){ 
-				superTypeBind.add(superclass);
-				superclass = superclass.getSuperclass();
-				if(!superclass.getQualifiedName().equals(desc)) 
-					superMatch= true;
+			if(typeBind.getQualifiedName().equals(desc)){
+				subTypes.addAll(Arrays.asList(typeBind.getDeclaredTypes()));
 			}
-			
-			if(superMatch) subTypes.addAll(superTypeBind);
-			
-			ITypeBinding[] interfaceBinds = typeBind.getInterfaces();
-			
-			subTypes.addAll(Arrays.asList(interfaceBinds));
-		}
-			
+			else{
+				Set<ITypeBinding> superTypeBind = new HashSet<ITypeBinding>();
+				
+				ITypeBinding superclass = typeBind;
+				boolean superMatch = false;
+				
+				while(superclass!=null && !superMatch){ 
+					
+					superTypeBind.add(superclass);
+					
+					ITypeBinding[] indirectInterfaceBinds = superclass.getInterfaces();
+					
+					for(ITypeBinding iib: indirectInterfaceBinds){
+						if(iib.getQualifiedName().equals(desc)){
+							subTypes.addAll(superTypeBind);
+							superTypeBind.clear();
+						}
+					}
+					
+					superclass = superclass.getSuperclass();
+					
+					if(superclass.getQualifiedName().equals(desc)) 
+						superMatch = true;
+				}
+				
+				if(superMatch) subTypes.addAll(superTypeBind);
+				
+			}
+		}	
 		return subTypes;
 	}
 
@@ -778,7 +753,7 @@ public final class DCLUtil {
 	 * packages
 	 */
 	public static boolean hasClassNameByDescription(final String className, final String moduleDescription,
-			final Map<String, String> modules, final Collection<String> projectClassNames, final File projectPath) {
+			final Map<String, String> modules, final Collection<String> projectClassNames, final List<ITypeBinding> typeBindings) {
 		
 		for (String desc : moduleDescription.split(",")) {
 			desc = desc.trim();
@@ -793,7 +768,7 @@ public final class DCLUtil {
 				 * If it's a module, call again the same method to return with
 				 * its description
 				 */
-				if (hasClassNameByDescription(className, modules.get(desc), modules, projectClassNames, projectPath)) {
+				if (hasClassNameByDescription(className, modules.get(desc), modules, projectClassNames, typeBindings)) {
 					return true;
 				}
 			} else if (desc.endsWith("**")) {
@@ -814,39 +789,13 @@ public final class DCLUtil {
 				if (className.matches(desc)) {
 					return true;
 				}
-			} else if (desc.endsWith("+")) {
-				//TODO: VERIFICAR SE EXISTE UM MEIO MENOS "CUSTOSO" DE FAZER O PROCEDIMENTO A SEGUIR
-				
+			} else if (desc.endsWith("+")) {		
 				/* If it refers to subtypes */
-				desc = desc.substring(0, desc.length() - 1);
+				desc = desc.substring(0, desc.length() - 1); //TODO: -1 ou -2 ??? -- TESTAR
 				Set<ITypeBinding> listSubTypes = new HashSet<ITypeBinding>();
 
-				try {
-					
-					List<String> classPath = new ArrayList<String>();
-					List<String> sourcePath = new ArrayList<String>();
-					
-					classPath.addAll(getPath(projectPath));
-					sourcePath.addAll(getSource(projectPath));
-					
-					String[] classpathEntries = classPath.toArray(new String[classPath.size()]);
-					String[] sourcepathEntries = sourcePath.toArray(new String[sourcePath.size()]);
-					
-					Stack<File> stack = new Stack<File>();
-					stack.push(projectPath);
-						loop: while(!stack.isEmpty()) {
-							File child = stack.pop();
-							if (child.isDirectory()) {
-							  for(File f : child.listFiles())
-								  stack.push(f);
-							} else if (child.isFile() && child.getName().endsWith(".java")) {
-								listSubTypes = getSubTypes(
-										getCompilationUnitFromAST(child, classpathEntries, sourcepathEntries),
-										desc);
+				listSubTypes.addAll(getSubTypes(typeBindings, desc));
 								
-							}
-						}
-
 					StringBuilder strBuilder = new StringBuilder();
 					for (ITypeBinding t : listSubTypes) {
 						strBuilder.append(t.getQualifiedName() + ",");
@@ -855,12 +804,9 @@ public final class DCLUtil {
 						strBuilder.deleteCharAt(strBuilder.length() - 1);
 					}
 					modules.put(desc + "+", strBuilder.toString());
-					if (hasClassNameByDescription(className, modules.get(desc + "+"), modules, projectClassNames, projectPath)) {
+					if (hasClassNameByDescription(className, modules.get(desc + "+"), modules, projectClassNames, typeBindings)) {
 						return true;
 					}
-				} catch (IOException | ParseException | CoreException | DCLException e) {
-					e.printStackTrace();
-				}
 			} else {
 				/* If it refers to a specific class */
 				if (desc.equals(className)) {

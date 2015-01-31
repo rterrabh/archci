@@ -4,16 +4,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.jdt.core.dom.ITypeBinding;
 
+import com.archci.ast.DCLDeepDependencyVisitor;
 import com.archci.core.DependencyConstraint;
 import com.archci.dependencies.Dependency;
 import com.archci.exception.DCLException;
@@ -23,47 +21,18 @@ import com.archci.util.DCLUtil;
 
 public class Main {
 	public static void main(String args[]) throws DCLException, IOException, CoreException, ParseException{
-		
-		/*
-		//String path = "/Users/arthurfp/Documents/workspace/ArchCI_exampleproject";
-		String path = "/Users/arthurfp/Movies/DCL-master/dclsuite";
-		File folder = new File(path);
-		*/
-		
-		/*/Users/arthurfp/Movies/DCL-master/dclsuite*/
-		
-		List<File> folders = new ArrayList<File>();
-		List<String> classPath = new ArrayList<String>();
-		List<String> sourcePath = new ArrayList<String>();
-		
-		for (String arg : args) {
+		if(args.length>0){
 			
-			File folder = new File(arg);
-			
-			classPath.addAll(DCLUtil.getPath(folder));
-			sourcePath.addAll(DCLUtil.getSource(folder));
-			
-			folders.add(folder);
-		}
+			for (String arg : args) {
 				
-		if(!folders.isEmpty()){		
-			for (File folder : folders) {
+				File folder = new File(arg);
 				
-				System.out.println("\nPATH: "+folder.getAbsolutePath()+"\n");
+				System.out.println("PATH: "+folder.getAbsolutePath());
 				
-				Stack<File> stack = new Stack<File>();
-				stack.push(folder);
-					while(!stack.isEmpty()) {
-						File child = stack.pop();
-						if (child.isDirectory()) {
-						  for(File f : child.listFiles())
-							  stack.push(f);
-						} else if (child.isFile() && child.getName().endsWith(".dcl")) {
-							printDCLParser(child);
-						} else if(child.isFile() && child.getName().endsWith(".java")) {
-							printDependencies(child, classPath, sourcePath);
-						}
-					}
+				File dclFile = DCLUtil.getDCLFile(folder);
+				
+				if(dclFile!=null) printDCLParser(dclFile);
+				printDependencies(folder);
 			}
 		}
 		else System.out.println("No arguments (path) passed");
@@ -92,17 +61,27 @@ public class Main {
 			}
 		}
 		
-		public static void printDependencies(File file, List<String> classPath, List<String> sourcePath) throws CoreException, IOException, DCLException{
-		
-			File f = new File(file.getAbsolutePath());
+		public static void printDependencies(File projectPath) throws CoreException, IOException, DCLException, ParseException{
+			List<String> classPath = new LinkedList<String>();
+			List<String> sourcePath = new LinkedList<String>();
+			
+			classPath.addAll(DCLUtil.getPath(projectPath));
+			sourcePath.addAll(DCLUtil.getSource(projectPath));
+			
+			String[] classPathEntries = classPath.toArray(new String[classPath.size()]);
+			String[] sourcePathEntries = sourcePath.toArray(new String[sourcePath.size()]);
+
+			for (File f : DCLUtil.getFilesFromProject(projectPath)) {
+				DCLDeepDependencyVisitor ddv = DCLUtil.useAST(f, classPathEntries, sourcePathEntries);
+			
+				Collection<Dependency> dependencies;
+				dependencies = ddv.getDependencies();
 				
-			Collection<Dependency> dependencies;
-			dependencies = DCLUtil.getDependenciesUsingAST(f, classPath, sourcePath);
-			
-			System.out.println("\nDependency List from "+file.getName()+":\n");
-			
-			for (Dependency dep : dependencies) {
-				System.out.println(dep.toString());
+				System.out.println("\nDependency List from "+ddv.getClassName()+":\n");
+				
+				for (Dependency dep : dependencies) {
+					System.out.println(dep.toString());
+				}
 			}
 		}
-}
+	}

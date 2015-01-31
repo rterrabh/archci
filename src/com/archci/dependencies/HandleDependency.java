@@ -1,6 +1,5 @@
 package com.archci.dependencies;
 
-import com.archci.dependencies.Dependency;
 
 public abstract class HandleDependency extends Dependency {
 

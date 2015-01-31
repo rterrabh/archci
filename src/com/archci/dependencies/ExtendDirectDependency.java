@@ -1,6 +1,5 @@
 package com.archci.dependencies;
 
-import com.archci.dependencies.ExtendDependency;
 
 public final class ExtendDirectDependency extends ExtendDependency {
 

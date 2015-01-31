@@ -1,8 +1,5 @@
 package com.archci.enums;
 
-import com.archci.enums.Constraint;
-import com.archci.enums.ConstraintType;
-import com.archci.enums.DependencyType;
 
 public enum Constraint {
 	CAN_ACCESS("can-access",ConstraintType.ONLY_CAN,DependencyType.ACCESS), 

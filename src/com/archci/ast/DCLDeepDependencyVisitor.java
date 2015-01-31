@@ -1,23 +1,13 @@
 package com.archci.ast;
 
 import java.io.File;
-import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
-import org.eclipse.jdt.core.IJavaElement;
-import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.ITypeRoot;
-import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
-import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.AbstractTypeDeclaration;
 import org.eclipse.jdt.core.dom.AnnotationTypeDeclaration;
@@ -42,8 +32,6 @@ import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
-import org.eclipse.jdt.internal.core.JavaElement;
-import org.eclipse.jface.text.Document;
 
 import com.archci.dependencies.AccessFieldDependency;
 import com.archci.dependencies.AccessMethodDependency;
@@ -70,23 +58,23 @@ import com.archci.util.DCLUtil;
 
 public class DCLDeepDependencyVisitor extends ASTVisitor {
 	private List<Dependency> dependencies;
+	private ITypeBinding typeBinding;
 
-	//private CompilationUnit unit;
-	private CompilationUnit fullClass;
+	private CompilationUnit cUnit;
 	private String className;
 
-	public DCLDeepDependencyVisitor(File file, String[] classPath, String[] sourcePath) throws DCLException {
+	public DCLDeepDependencyVisitor(File f, String[] classPathEntries, String[] sourcePathEntries) throws DCLException {
 		try{
 			
 			this.dependencies = new ArrayList<Dependency>();
-			this.className = FilenameUtils.removeExtension(file.getName());
 		    
-		    fullClass = DCLUtil.getCompilationUnitFromAST(file, classPath, sourcePath);
+		    this.cUnit = DCLUtil.getCompilationUnitFromAST(f, classPathEntries, sourcePathEntries);
+		    this.className = DCLUtil.getClassName(this.cUnit,f);
 		    
-		    this.fullClass.accept(this);
+			this.cUnit.accept(this);
 		    
 		} catch(Exception e){
-			throw new DCLException(e,fullClass);
+			throw new DCLException(e,this.cUnit);
 		}
 	}
 	
@@ -107,9 +95,11 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 																					// v�rias
 																					// vezes
 			try {
-				List<AbstractTypeDeclaration> types = fullClass.types();				
+				List<AbstractTypeDeclaration> types = cUnit.types();				
 				TypeDeclaration typeDeclaration  = (TypeDeclaration) types.get(0);
 				ITypeBinding typeBind = typeDeclaration.resolveBinding();
+				
+				this.typeBinding = typeBind;
 				
 				Set<ITypeBinding> superTypeBind = new HashSet<ITypeBinding>();
 				Set<ITypeBinding> interfaceBinds = new HashSet<ITypeBinding>();
@@ -128,7 +118,7 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 				for (ITypeBinding t : superTypeBind) {
 					if (node.getSuperclassType() != null
 							&& t.getQualifiedName().equals(node.getSuperclassType().resolveBinding().getQualifiedName())) {
-						this.dependencies.add(new ExtendDirectDependency(this.className, t.getQualifiedName(), fullClass
+						this.dependencies.add(new ExtendDirectDependency(this.className, t.getQualifiedName(), cUnit
 								.getLineNumber(node.getSuperclassType().getStartPosition()), node.getSuperclassType().getStartPosition(),
 								node.getSuperclassType().getLength()));
 					} else {
@@ -164,9 +154,9 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 							if (t.getQualifiedName().equals(st.getName().resolveTypeBinding().getQualifiedName())) {
 								if (!typeDeclaration.isInterface()) {
 									this.dependencies.add(new ImplementDirectDependency(this.className, t.getQualifiedName(),
-											fullClass.getLineNumber(st.getStartPosition()), st.getStartPosition(), st.getLength()));
+											cUnit.getLineNumber(st.getStartPosition()), st.getStartPosition(), st.getLength()));
 								} else {
-									this.dependencies.add(new ExtendDirectDependency(this.className, t.getQualifiedName(), fullClass
+									this.dependencies.add(new ExtendDirectDependency(this.className, t.getQualifiedName(), cUnit
 											.getLineNumber(st.getStartPosition()), st.getStartPosition(), st.getLength()));
 								}
 								continue externo;
@@ -182,10 +172,10 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 								if (!typeDeclaration.isInterface()) {
 									this.dependencies.add(new ImplementDirectDependency(this.className, t.getQualifiedName(),
 									//this.dependencies.add(new ImplementDirectDependency(this.className, t.getBinaryName(),
-											fullClass.getLineNumber(pt.getStartPosition()), pt.getStartPosition(), pt.getLength()));
+											cUnit.getLineNumber(pt.getStartPosition()), pt.getStartPosition(), pt.getLength()));
 								} else {
 /*Tirar duvida de como entraria*/									
-									this.dependencies.add(new ExtendDirectDependency(this.className, t.getBinaryName(), fullClass
+									this.dependencies.add(new ExtendDirectDependency(this.className, t.getBinaryName(), cUnit
 											.getLineNumber(pt.getStartPosition()), pt.getStartPosition(), pt.getLength()));
 								}
 								continue externo;
@@ -207,16 +197,16 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 		if (node.getParent().getNodeType() == ASTNode.FIELD_DECLARATION) {
 			FieldDeclaration field = (FieldDeclaration) node.getParent();
 			this.dependencies.add(new AnnotateFieldDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
 					((VariableDeclarationFragment) field.fragments().get(0)).getName().getIdentifier()));
 		} else if (node.getParent().getNodeType() == ASTNode.METHOD_DECLARATION) {
 			MethodDeclaration method = (MethodDeclaration) node.getParent();
 			this.dependencies.add(new AnnotateMethodDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), method.getName()
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), method.getName()
 							.getIdentifier()));
 		} else if (node.getParent().getNodeType() == ASTNode.TYPE_DECLARATION) {
 			this.dependencies.add(new AnnotateClassDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength()));
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength()));
 		} else if (node.getParent().getNodeType() == ASTNode.VARIABLE_DECLARATION_STATEMENT) {
 /*tirar duvida sobre como testar*/
 			VariableDeclarationStatement st = (VariableDeclarationStatement) node.getParent();
@@ -225,7 +215,7 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 			if (relevantParent.getNodeType() == ASTNode.METHOD_DECLARATION) {
 				MethodDeclaration md = (MethodDeclaration) relevantParent;
 				this.dependencies.add(new AnnotateVariableDependency(this.className, node.getTypeName().resolveTypeBinding()
-						.getQualifiedName(), fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
+						.getQualifiedName(), cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
 						md.getName().getIdentifier(), vdf.getName().getIdentifier()));
 			}
 		} else if (node.getParent().getNodeType() == ASTNode.SINGLE_VARIABLE_DECLARATION) {
@@ -234,7 +224,7 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 			if (relevantParent.getNodeType() == ASTNode.METHOD_DECLARATION) {
 				MethodDeclaration md = (MethodDeclaration) relevantParent;
 				this.dependencies.add(new AnnotateFormalParameterDependency(this.className, node.getTypeName().resolveTypeBinding()
-						.getQualifiedName(), fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
+						.getQualifiedName(), cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
 						md.getName().getIdentifier(), sv.getName().getIdentifier()));
 			}
 
@@ -248,16 +238,16 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 		if (node.getParent().getNodeType() == ASTNode.FIELD_DECLARATION) {
 			FieldDeclaration field = (FieldDeclaration) node.getParent();
 			this.dependencies.add(new AnnotateFieldDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
 					((VariableDeclarationFragment) field.fragments().get(0)).getName().getIdentifier()));
 		} else if (node.getParent().getNodeType() == ASTNode.METHOD_DECLARATION) {
 			MethodDeclaration method = (MethodDeclaration) node.getParent();
 			this.dependencies.add(new AnnotateMethodDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), method.getName()
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), method.getName()
 							.getIdentifier()));
 		} else if (node.getParent().getNodeType() == ASTNode.TYPE_DECLARATION) {
 			this.dependencies.add(new AnnotateClassDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength()));
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength()));
 		}
 		return true;
 	}
@@ -270,18 +260,18 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 		case ASTNode.FIELD_DECLARATION:
 			FieldDeclaration fd = (FieldDeclaration) relevantParent;
 			this.dependencies.add(new CreateFieldDependency(this.className, this.getTargetClassName(node.getType().resolveBinding()),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
 					((VariableDeclarationFragment) fd.fragments().get(0)).getName().getIdentifier()));
 			break;
 		case ASTNode.METHOD_DECLARATION:
 			MethodDeclaration md = (MethodDeclaration) relevantParent;
 			this.dependencies.add(new CreateMethodDependency(this.className, this.getTargetClassName(node.getType().resolveBinding()),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), md.getName()
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), md.getName()
 							.getIdentifier()));
 			break;
 		case ASTNode.INITIALIZER:
 			this.dependencies
-					.add(new CreateMethodDependency(this.className, this.getTargetClassName(node.getType().resolveBinding()), fullClass
+					.add(new CreateMethodDependency(this.className, this.getTargetClassName(node.getType().resolveBinding()), cUnit
 							.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), "initializer static block"));
 			break;
 		}
@@ -292,7 +282,7 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 	@Override
 	public boolean visit(FieldDeclaration node) {
 		this.dependencies.add(new DeclareFieldDependency(this.className, this.getTargetClassName(node.getType().resolveBinding()),
-				fullClass.getLineNumber(node.getType().getStartPosition()), node.getType().getStartPosition(), node.getType().getLength(),
+				cUnit.getLineNumber(node.getType().getStartPosition()), node.getType().getStartPosition(), node.getType().getLength(),
 				((VariableDeclarationFragment) node.fragments().get(0)).getName().getIdentifier()));
 		return true;
 	}
@@ -303,7 +293,7 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 			if (o instanceof SingleVariableDeclaration) {
 				SingleVariableDeclaration svd = (SingleVariableDeclaration) o;
 				this.dependencies.add(new DeclareParameterDependency(this.className, this
-						.getTargetClassName(svd.getType().resolveBinding()), fullClass.getLineNumber(svd.getStartPosition()), svd
+						.getTargetClassName(svd.getType().resolveBinding()), cUnit.getLineNumber(svd.getStartPosition()), svd
 						.getStartPosition(), svd.getLength(), node.getName().getIdentifier(), svd.getName().getIdentifier()));
 				if (svd.getType().getNodeType() == Type.PARAMETERIZED_TYPE) {
 					// TODO: Adjust the way that we handle parameter types
@@ -311,12 +301,12 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 						if (t instanceof SimpleType) {
 							SimpleType st = (SimpleType) t;
 							this.dependencies.add(new DeclareParameterDependency(this.className, this.getTargetClassName(st
-									.resolveBinding()), fullClass.getLineNumber(st.getStartPosition()), st.getStartPosition(), st
+									.resolveBinding()), cUnit.getLineNumber(st.getStartPosition()), st.getStartPosition(), st
 									.getLength(), node.getName().getIdentifier(), svd.getName().getIdentifier()));
 						} else if (t instanceof ParameterizedType) {
 							ParameterizedType pt = (ParameterizedType) t;
 							this.dependencies.add(new DeclareParameterDependency(this.className, this.getTargetClassName(pt.getType()
-									.resolveBinding()), fullClass.getLineNumber(pt.getStartPosition()), pt.getStartPosition(), pt
+									.resolveBinding()), cUnit.getLineNumber(pt.getStartPosition()), pt.getStartPosition(), pt
 									.getLength(), node.getName().getIdentifier(), svd.getName().getIdentifier()));
 						}
 					}
@@ -326,7 +316,7 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 		}
 		for (Object o : node.thrownExceptions()) {
 			Name name = (Name) o;
-			this.dependencies.add(new ThrowDependency(this.className, this.getTargetClassName(name.resolveTypeBinding()), fullClass
+			this.dependencies.add(new ThrowDependency(this.className, this.getTargetClassName(name.resolveTypeBinding()), cUnit
 					.getLineNumber(name.getStartPosition()), name.getStartPosition(), name.getLength(), node.getName().getIdentifier()));
 		}
 
@@ -334,13 +324,13 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 				&& !(node.getReturnType2().isPrimitiveType() && ((PrimitiveType) node.getReturnType2()).getPrimitiveTypeCode() == PrimitiveType.VOID)) {
 			if (!node.getReturnType2().resolveBinding().isTypeVariable()) {
 				this.dependencies.add(new DeclareReturnDependency(this.className, this.getTargetClassName(node.getReturnType2()
-						.resolveBinding()), fullClass.getLineNumber(node.getReturnType2().getStartPosition()), node.getReturnType2()
+						.resolveBinding()), cUnit.getLineNumber(node.getReturnType2().getStartPosition()), node.getReturnType2()
 						.getStartPosition(), node.getReturnType2().getLength(), node.getName().getIdentifier()));
 			} else {
 /*tirar duvida de quando entraria*/
 				if (node.getReturnType2().resolveBinding().getTypeBounds().length >= 1) {
 					this.dependencies.add(new DeclareReturnDependency(this.className, this.getTargetClassName(node.getReturnType2()
-							.resolveBinding().getTypeBounds()[0]), fullClass.getLineNumber(node.getReturnType2().getStartPosition()), node
+							.resolveBinding().getTypeBounds()[0]), cUnit.getLineNumber(node.getReturnType2().getStartPosition()), node
 							.getReturnType2().getStartPosition(), node.getReturnType2().getLength(), node.getName().getIdentifier()));
 				}
 			}
@@ -358,14 +348,14 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 			MethodDeclaration md = (MethodDeclaration) relevantParent;
 
 			this.dependencies.add(new DeclareLocalVariableDependency(this.className, this.getTargetClassName(node.getType()
-					.resolveBinding()), fullClass.getLineNumber(node.getStartPosition()), node.getType().getStartPosition(), node.getType()
+					.resolveBinding()), cUnit.getLineNumber(node.getStartPosition()), node.getType().getStartPosition(), node.getType()
 					.getLength(), md.getName().getIdentifier(), ((VariableDeclarationFragment) node.fragments().get(0)).getName()
 					.getIdentifier()));
 
 			break;
 		case ASTNode.INITIALIZER:
 			this.dependencies.add(new DeclareLocalVariableDependency(this.className, this.getTargetClassName(node.getType()
-					.resolveBinding()), fullClass.getLineNumber(node.getStartPosition()), node.getType().getStartPosition(), node.getType()
+					.resolveBinding()), cUnit.getLineNumber(node.getStartPosition()), node.getType().getStartPosition(), node.getType()
 					.getLength(), "initializer static block", ((VariableDeclarationFragment) node.fragments().get(0)).getName()
 					.getIdentifier()));
 			break;
@@ -386,14 +376,14 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 			MethodDeclaration md = (MethodDeclaration) relevantParent;
 			if (node.getExpression() != null) {
 				this.dependencies.add(new AccessMethodDependency(this.className, this.getTargetClassName(node.getExpression()
-						.resolveTypeBinding()), fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(),
+						.resolveTypeBinding()), cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(),
 						node.getLength(), md.getName().getIdentifier(), node.getName().getIdentifier(), isStatic != 0));
 			}
 			break;
 		case ASTNode.INITIALIZER:
 			if (node.getExpression() != null) {
 				this.dependencies.add(new AccessMethodDependency(this.className, this.getTargetClassName(node.getExpression()
-						.resolveTypeBinding()), fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(),
+						.resolveTypeBinding()), cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(),
 						node.getLength(), "initializer static block", node.getName().getIdentifier(), isStatic != 0));
 			}
 			break;
@@ -411,13 +401,13 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 		case ASTNode.METHOD_DECLARATION:
 			MethodDeclaration md = (MethodDeclaration) relevantParent;
 			this.dependencies.add(new AccessFieldDependency(this.className, this.getTargetClassName(node.getExpression()
-					.resolveTypeBinding()), fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), md
+					.resolveTypeBinding()), cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), md
 					.getName().getFullyQualifiedName(), node.getName().getFullyQualifiedName(), isStatic != 0));
 			break;
 		case ASTNode.INITIALIZER:
 /*tirar duvida de quando entraria*/			
 			this.dependencies.add(new AccessFieldDependency(this.className, this.getTargetClassName(node.getExpression()
-					.resolveTypeBinding()), fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
+					.resolveTypeBinding()), cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
 					"initializer static block", node.getName().getFullyQualifiedName(), isStatic != 0));
 			break;
 		}
@@ -436,12 +426,12 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 			case ASTNode.METHOD_DECLARATION:
 				MethodDeclaration md = (MethodDeclaration) relevantParent;
 				this.dependencies.add(new AccessFieldDependency(this.className, this.getTargetClassName(node.getQualifier()
-						.resolveTypeBinding()), fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(),
+						.resolveTypeBinding()), cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(),
 						node.getLength(), md.getName().getFullyQualifiedName(), node.getName().getFullyQualifiedName(), isStatic != 0));
 				break;
 			case ASTNode.INITIALIZER:
 				this.dependencies.add(new AccessFieldDependency(this.className, this.getTargetClassName(node.getQualifier()
-						.resolveTypeBinding()), fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(),
+						.resolveTypeBinding()), cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(),
 						node.getLength(), "initializer static block", node.getName().getFullyQualifiedName(), isStatic != 0));
 				break;
 			}
@@ -466,16 +456,16 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 		if (node.getParent().getNodeType() == ASTNode.FIELD_DECLARATION) {
 			FieldDeclaration field = (FieldDeclaration) node.getParent();
 			this.dependencies.add(new AnnotateFieldDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(),
 					((VariableDeclarationFragment) field.fragments().get(0)).getName().getIdentifier()));
 		} else if (node.getParent().getNodeType() == ASTNode.METHOD_DECLARATION) {
 			MethodDeclaration method = (MethodDeclaration) node.getParent();
 			this.dependencies.add(new AnnotateMethodDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), method.getName()
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength(), method.getName()
 							.getIdentifier()));
 		} else if (node.getParent().getNodeType() == ASTNode.TYPE_DECLARATION) {
 			this.dependencies.add(new AnnotateClassDependency(this.className, node.getTypeName().resolveTypeBinding().getQualifiedName(),
-					fullClass.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength()));
+					cUnit.getLineNumber(node.getStartPosition()), node.getStartPosition(), node.getLength()));
 		}
 		return true;
 	};
@@ -491,10 +481,10 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 					if (relevantParent.getNodeType() == ASTNode.METHOD_DECLARATION) {
 						MethodDeclaration md = (MethodDeclaration) relevantParent;
 						this.dependencies.add(new DeclareParameterizedTypeDependency(this.className, this.getTargetClassName(t
-								.resolveBinding()), fullClass.getLineNumber(t.getStartPosition()), t.getStartPosition(), t.getLength(),md.getName().getIdentifier()));
+								.resolveBinding()), cUnit.getLineNumber(t.getStartPosition()), t.getStartPosition(), t.getLength(),md.getName().getIdentifier()));
 					}else{
 						this.dependencies.add(new DeclareParameterizedTypeDependency(this.className, this.getTargetClassName(t
-								.resolveBinding()), fullClass.getLineNumber(t.getStartPosition()), t.getStartPosition(), t.getLength()));
+								.resolveBinding()), cUnit.getLineNumber(t.getStartPosition()), t.getStartPosition(), t.getLength()));
 					}
 				}
 			}
@@ -536,5 +526,13 @@ public class DCLDeepDependencyVisitor extends ASTVisitor {
 		}
 
 		return result;
+	}
+	
+	public CompilationUnit getcUnit() {
+		return cUnit;
+	}
+	
+	public ITypeBinding getITypeBinding() {
+		return typeBinding;
 	}
 }

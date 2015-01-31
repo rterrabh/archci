@@ -1,15 +1,13 @@
 package com.archci.core;
 
-import java.io.File;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-
-//import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.jdt.core.dom.ITypeBinding;
 
 import com.archci.dependencies.Dependency;
 import com.archci.dependencies.ExtendIndirectDependency;
@@ -31,35 +29,35 @@ public class DependencyConstraint implements Comparable<DependencyConstraint> {
 	}
 
 	public List<ArchitecturalDrift> validate(String className, final Map<String, String> modules, Set<String> projectClasses,
-			Collection<Dependency> dependencies, File projectPath) throws CoreException {
+			Collection<Dependency> dependencies, List<ITypeBinding> typeBindings) throws CoreException {
 		switch (this.constraint.getConstraintType()) {
 		case ONLY_CAN:
-			if (DCLUtil.hasClassNameByDescription(className, moduleDescriptionA, modules, projectClasses, projectPath)) {
+			if (DCLUtil.hasClassNameByDescription(className, moduleDescriptionA, modules, projectClasses, typeBindings)) {
 				return null;
 			}
 			return this.validateCannot(className, moduleDescriptionB, this.constraint.getDependencyType().getDependencyClass(), modules,
-					projectClasses, dependencies, projectPath);
+					projectClasses, dependencies, typeBindings);
 
 		case CANNOT:
-			if (!DCLUtil.hasClassNameByDescription(className, moduleDescriptionA, modules, projectClasses, projectPath)) {
+			if (!DCLUtil.hasClassNameByDescription(className, moduleDescriptionA, modules, projectClasses, typeBindings)) {
 				return null;
 			}
 			return this.validateCannot(className, moduleDescriptionB, this.constraint.getDependencyType().getDependencyClass(), modules,
-					projectClasses, dependencies, projectPath);
+					projectClasses, dependencies, typeBindings);
 
 		case CAN_ONLY:
-			if (!DCLUtil.hasClassNameByDescription(className, moduleDescriptionA, modules, projectClasses, projectPath)) {
+			if (!DCLUtil.hasClassNameByDescription(className, moduleDescriptionA, modules, projectClasses, typeBindings)) {
 				return null;
 			}
 			return this.validateCanOnly(className, moduleDescriptionB, this.constraint.getDependencyType().getDependencyClass(), modules,
-					projectClasses, dependencies, projectPath);
+					projectClasses, dependencies, typeBindings);
 
 		case MUST:
-			if (!DCLUtil.hasClassNameByDescription(className, moduleDescriptionA, modules, projectClasses, projectPath)) {
+			if (!DCLUtil.hasClassNameByDescription(className, moduleDescriptionA, modules, projectClasses, typeBindings)) {
 				return null;
 			}
 			return this.validateMust(className, moduleDescriptionB, this.constraint.getDependencyType().getDependencyClass(), modules,
-					projectClasses, dependencies, projectPath);
+					projectClasses, dependencies, typeBindings);
 		}
 
 		return null;
@@ -70,7 +68,7 @@ public class DependencyConstraint implements Comparable<DependencyConstraint> {
 	 */
 	private List<ArchitecturalDrift> validateCannot(String className, String moduleDescriptionB,
 			Class<? extends Dependency> dependencyClass, Map<String, String> modules, Set<String> projectClasses,
-			Collection<Dependency> dependencies, File projectPath) {
+			Collection<Dependency> dependencies, List<ITypeBinding> typeBindings) {
 		List<ArchitecturalDrift> architecturalDrifts = new LinkedList<ArchitecturalDrift>();
 		/* For each dependency */
 		for (Dependency d : dependencies) {
@@ -83,7 +81,7 @@ public class DependencyConstraint implements Comparable<DependencyConstraint> {
 					continue;
 				}
 				
-				if (DCLUtil.hasClassNameByDescription(d.getClassNameB(), moduleDescriptionB, modules, projectClasses, projectPath)) {
+				if (DCLUtil.hasClassNameByDescription(d.getClassNameB(), moduleDescriptionB, modules, projectClasses, typeBindings)) {
 					architecturalDrifts.add(new DivergenceArchitecturalDrift(this, d));
 				}
 			}
@@ -96,7 +94,7 @@ public class DependencyConstraint implements Comparable<DependencyConstraint> {
 	 */
 	private List<ArchitecturalDrift> validateCanOnly(String className, String moduleDescriptionB,
 			Class<? extends Dependency> dependencyClass, Map<String, String> modules, Set<String> projectClasses,
-			Collection<Dependency> dependencies, File projectPath) {
+			Collection<Dependency> dependencies, List<ITypeBinding> typeBindings) {
 		List<ArchitecturalDrift> architecturalDrifts = new LinkedList<ArchitecturalDrift>();
 
 		/* For each dependency */
@@ -109,7 +107,7 @@ public class DependencyConstraint implements Comparable<DependencyConstraint> {
 				if (d instanceof ExtendIndirectDependency || d instanceof ImplementIndirectDependency){
 					continue;
 				}
-				if (!DCLUtil.hasClassNameByDescription(d.getClassNameB(), moduleDescriptionB, modules, projectClasses, projectPath)) {
+				if (!DCLUtil.hasClassNameByDescription(d.getClassNameB(), moduleDescriptionB, modules, projectClasses, typeBindings)) {
 					architecturalDrifts.add(new DivergenceArchitecturalDrift(this, d));
 				}
 
@@ -122,7 +120,7 @@ public class DependencyConstraint implements Comparable<DependencyConstraint> {
 	 * must
 	 */
 	private List<ArchitecturalDrift> validateMust(String className, String moduleDescriptionB, Class<? extends Dependency> dependencyClass,
-			Map<String, String> modules, Set<String> projectClasses, Collection<Dependency> dependencies, File projectPath) {
+			Map<String, String> modules, Set<String> projectClasses, Collection<Dependency> dependencies, List<ITypeBinding> typeBindings) {
 		List<ArchitecturalDrift> architecturalDrifts = new LinkedList<ArchitecturalDrift>();
 
 		// TODO: What am I supposed to do in case of internal class?
@@ -130,14 +128,14 @@ public class DependencyConstraint implements Comparable<DependencyConstraint> {
 			return null;
 		} else if (className.equals(moduleDescriptionB)) {
 			return null;
-		} else if (DCLUtil.hasClassNameByDescription(className, moduleDescriptionB, modules, projectClasses, projectPath)) {
+		} else if (DCLUtil.hasClassNameByDescription(className, moduleDescriptionB, modules, projectClasses, typeBindings)) {
 			return null;
 		}
 
 		boolean found = false;
 		for (Dependency d : dependencies) {
 			if (dependencyClass.isAssignableFrom(d.getClass())) {
-				if (DCLUtil.hasClassNameByDescription(d.getClassNameB(), moduleDescriptionB, modules, projectClasses, projectPath)) {
+				if (DCLUtil.hasClassNameByDescription(d.getClassNameB(), moduleDescriptionB, modules, projectClasses, typeBindings)) {
 					found = true;
 					break;
 				}

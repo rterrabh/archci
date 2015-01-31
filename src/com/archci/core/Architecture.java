@@ -9,25 +9,23 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-
-
-
-/*import org.eclipse.core.resources.IFile;
-import org.eclipse.core.resources.IProject;
-*/
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.jdt.core.dom.ITypeBinding;
 
-import com.archci.parser.DCLParser;
+import com.archci.ast.DCLDeepDependencyVisitor;
 import com.archci.core.DependencyConstraint.ArchitecturalDrift;
 import com.archci.dependencies.Dependency;
 import com.archci.enums.DependencyType;
+import com.archci.exception.DCLException;
 import com.archci.exception.ParseException;
+import com.archci.parser.DCLParser;
 import com.archci.util.DCLUtil;
 
 public class Architecture {
@@ -47,17 +45,36 @@ public class Architecture {
 	/**
 	 * Collection<DependencyConstraint>: Collection of dependency constraints
 	 */
+	
+	/**
+	 * List of all ITypeBinding
+	 * 
+	 */
+	public List<ITypeBinding> typeBindings = null;
+
+	
 	public Collection<DependencyConstraint> dependencyConstraints = null;
 
-	public Architecture(File projectPath) throws CoreException, ParseException, IOException {
+	public Architecture(File projectPath) throws CoreException, ParseException, IOException, DCLException {
 		if (DEBUG) {
 			System.out.println("Time BEFORE generate architecture (without dependencies): " + new Date());
 		}
 		this.projectClasses = new HashMap<String, Collection<Dependency>>();
 		this.modules = new ConcurrentHashMap<String, String>();
-
-		for (String className : DCLUtil.getClassNames(projectPath)) {
-			this.projectClasses.put(className, null);
+		
+		List<String> classPath = new LinkedList<String>();
+		List<String> sourcePath = new LinkedList<String>();
+		
+		classPath.addAll(DCLUtil.getPath(projectPath));
+		sourcePath.addAll(DCLUtil.getSource(projectPath));
+		
+		String[] classPathEntries = classPath.toArray(new String[classPath.size()]);
+		String[] sourcePathEntries = sourcePath.toArray(new String[sourcePath.size()]);
+		
+		for (File f : DCLUtil.getFilesFromProject(projectPath)) {
+			DCLDeepDependencyVisitor ddv = DCLUtil.useAST(f, classPathEntries, sourcePathEntries);
+			this.projectClasses.put(ddv.getClassName(), ddv.getDependencies());
+			this.typeBindings.add(ddv.getITypeBinding());
 		}
 
 		this.initializeDependencyConstraints(DCLUtil.getDCLFile(projectPath));
@@ -66,10 +83,10 @@ public class Architecture {
 		}
 	}
 
-	private void initializeDependencyConstraints(File file) throws CoreException, ParseException {
+	private void initializeDependencyConstraints(File dclFile) throws CoreException, ParseException {
 		try {
 
-			File dcl = new File(file.getAbsolutePath());
+			File dcl = new File(dclFile.getAbsolutePath());
 			InputStream inputStream = new FileInputStream(dcl);
 			
 			this.modules.putAll(DCLParser.parseModules(inputStream));
@@ -134,12 +151,12 @@ public class Architecture {
 	 * Method used to check if a particular dependency is allowed or not. It is
 	 * used, e.g., for the DCLfix module.
 	 */
-	public boolean can(String classNameA, String classNameB, DependencyType dependencyType, File projectPath) throws CoreException {
+	public boolean can(String classNameA, String classNameB, DependencyType dependencyType, List<ITypeBinding> typeBindings) throws CoreException {
 		final Collection<Dependency> dependencies = new ArrayList<Dependency>(1);
 		dependencies.add(dependencyType.createGenericDependency(classNameA, classNameB));
 
 		for (DependencyConstraint dc : this.getDependencyConstraints()) {
-			List<ArchitecturalDrift> violations = dc.validate(classNameA, modules, this.getProjectClasses(), dependencies, projectPath);
+			List<ArchitecturalDrift> violations = dc.validate(classNameA, modules, this.getProjectClasses(), dependencies, typeBindings);
 			if (violations != null && !violations.isEmpty()) {
 				return false;
 			}
@@ -152,7 +169,7 @@ public class Architecture {
 	 * Method used to check if some class of the system is allowed to establish
 	 * a particular dependency. It is used, e.g., for the DCLfix module.
 	 */
-	public boolean someclassCan(String classNameB, DependencyType dependencyType, File projectPath) throws CoreException {
+	public boolean someclassCan(String classNameB, DependencyType dependencyType, List<ITypeBinding> typeBindings) throws CoreException {
 
 		for (String classNameA : this.getProjectClasses()) {
 			if (classNameA.equals(classNameB)) {
@@ -168,8 +185,8 @@ public class Architecture {
 				 * Case we find some violation in this dependency in any
 				 * dependency constraint, we set flag false
 				 */
-				if (dc.validate(classNameA, modules, this.getProjectClasses(), dependencies, projectPath) != null
-						&& !dc.validate(classNameA, modules, this.getProjectClasses(), dependencies, projectPath).isEmpty()) {
+				if (dc.validate(classNameA, modules, this.getProjectClasses(), dependencies, typeBindings) != null
+						&& !dc.validate(classNameA, modules, this.getProjectClasses(), dependencies, typeBindings).isEmpty()) {
 					flag = false;
 				}
 			}

@@ -1,14 +1,13 @@
 package com.archci.tests;
 
-import static org.junit.Assert.*;
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.File;
 import java.util.ArrayList;
+
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.CoreMatchers.hasItems;
 
 import com.archci.ast.DCLDeepDependencyVisitor;
 import com.archci.dependencies.Dependency;
