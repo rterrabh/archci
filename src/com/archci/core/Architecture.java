@@ -60,6 +60,7 @@ public class Architecture {
 			System.out.println("Time BEFORE generate architecture (without dependencies): " + new Date());
 		}
 		this.projectClasses = new HashMap<String, Collection<Dependency>>();
+		this.typeBindings = new ArrayList<ITypeBinding>();
 		this.modules = new ConcurrentHashMap<String, String>();
 		
 		List<String> classPath = new LinkedList<String>();
@@ -76,8 +77,9 @@ public class Architecture {
 			this.projectClasses.put(ddv.getClassName(), ddv.getDependencies());
 			this.typeBindings.add(ddv.getITypeBinding());
 		}
-
+		
 		this.initializeDependencyConstraints(DCLUtil.getDCLFile(projectPath));
+		
 		if (DEBUG) {
 			System.out.println("Time AFTER generate architecture (without dependencies): " + new Date());
 		}
@@ -85,20 +87,22 @@ public class Architecture {
 
 	private void initializeDependencyConstraints(File dclFile) throws CoreException, ParseException {
 		try {
-
-			File dcl = new File(dclFile.getAbsolutePath());
-			InputStream inputStream = new FileInputStream(dcl);
-			
-			this.modules.putAll(DCLParser.parseModules(inputStream));
-
-			/* Define implicit modules */
-			this.modules.put("$java", DCLUtil.getJavaModuleDefinition());
-			/*
-			 * Module $system has its behavior in
-			 * DCLUtil.hasClassNameByDescription
-			 */
-
-			this.dependencyConstraints = DCLParser.parseDependencyConstraints(inputStream);
+			if(dclFile!=null){
+				File dcl = new File(dclFile.getAbsolutePath());
+				InputStream inputStream = new FileInputStream(dcl);
+				
+				this.modules.putAll(DCLParser.parseModules(inputStream));
+	
+				/* Define implicit modules */
+				this.modules.put("$java", DCLUtil.getJavaModuleDefinition());
+				/*
+				 * Module $system has its behavior in
+				 * DCLUtil.hasClassNameByDescription
+				 */
+	
+				this.dependencyConstraints = DCLParser.parseDependencyConstraints(inputStream);
+			}
+			else this.dependencyConstraints = new LinkedList<DependencyConstraint>();
 		} catch (ParseException e) {
 			throw e;
 		} catch (Throwable e) {
@@ -338,6 +342,9 @@ public class Architecture {
 		return list;
 	}
 	
+	public List<ITypeBinding> getITypeBindings(){
+		return typeBindings;
+	}
 	
 
 }
