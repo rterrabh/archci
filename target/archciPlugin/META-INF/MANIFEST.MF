@@ -1,0 +1,16 @@
+Manifest-Version: 1.0
+Built-By: arthurfp
+Created-By: Apache Maven
+Build-Jdk: 1.8.0_05
+Extension-Name: archciPlugin
+Implementation-Title: archciPlugin
+Implementation-Version: 0.1-SNAPSHOT
+Group-Id: com.archci.plugin
+Short-Name: archciPlugin
+Long-Name: Jenkins ArchCI Plugin
+Url: http://jenkins-ci.org/plugin/archciPlugin/
+Plugin-Version: 0.1-SNAPSHOT (private-03/24/2015 10:12-arthurfp)
+Hudson-Version: 1.602
+Jenkins-Version: 1.602
+Plugin-Developers: 
+

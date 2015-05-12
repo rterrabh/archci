@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Group-Id: org.jenkins-ci.plugins
+Short-Name: archciPlugin
+Long-Name: Jenkins ArchCi Plugin
+Url: http://jenkins-ci.org/plugin/archciPlugin/
+Plugin-Version: 0.1-SNAPSHOT (private-03/17/2015 23:56-arthurfp)
+Hudson-Version: 1.602
+Jenkins-Version: 1.602
+Plugin-Developers: 
+Libraries: /Users/arthurfp/Documents/workspace/DCLPlugin/target/classes
+Resource-Path: /Users/arthurfp/Documents/workspace/DCLPlugin/src/main/
+ webapp
+
