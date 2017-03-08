@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.jenkins-ci.plugins</groupId>
+  <artifactId>plugin</artifactId>
+  <version>2.23</version>
+  </parent>
+
+  <groupId>com.archci.plugin</groupId>
+  <artifactId>archciPlugin</artifactId>
+  <packaging>hpi</packaging>
+  <name>Jenkins ArchCI Plugin</name>
+  <version>0.1-SNAPSHOT</version>
+  
+  <properties>
+    <jenkins.version>1.609.1</jenkins.version>
+    <additionalparam>-Xdoclint:none</additionalparam>
+  </properties>
+
+ <dependencies>
+	  <dependency>
+	    <groupId>org.eclipse.jdt</groupId>
+	    <artifactId>org.eclipse.jdt.ui</artifactId>
+	    <version>3.12.2</version>
+	    <exclusions>
+                <exclusion>
+                    <groupId>org.eclipse.platform</groupId>
+                    <artifactId>org.eclipse.swt.gtk.linux.aarch64</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.platform</groupId>
+                    <artifactId>org.eclipse.swt.gtk.linux.arm</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.eclipse.emf</groupId>
+                    <artifactId>org.eclipse.emf.ecore.change</artifactId>
+                </exclusion>
+            </exclusions>
+	    
+	  </dependency>
+	  
+	  <dependency>
+	    <groupId>org.eclipse.jdt</groupId>
+	    <artifactId>org.eclipse.jdt.core</artifactId>
+	    <version>3.10.0</version>
+	  </dependency>
+	  
+	  <dependency>
+    	<groupId>org.eclipse.core</groupId>
+    	<artifactId>org.eclipse.core.contenttype</artifactId>
+    	<version>3.4.200.v20140207-1251</version>
+	  </dependency>
+	  
+	  <dependency>
+    	<groupId>org.eclipse.core</groupId>
+    	<artifactId>org.eclipse.core.resources</artifactId>
+    	<version>3.9.1.v20140825-1431</version>
+	  </dependency>
+	  
+	  <dependency>
+    	<groupId>org.eclipse.core</groupId>
+    	<artifactId>org.eclipse.core.runtime</artifactId>
+    	<version>3.10.0.v20140318-2214</version>
+	  </dependency>
+	  
+	  <dependency>
+    	<groupId>org.eclipse.equinox</groupId>
+    	<artifactId>org.eclipse.equinox.common</artifactId>
+    	<version>3.6.200.v20130402-1505</version>
+	  </dependency>
+	  
+	  <dependency>
+    	<groupId>commons-io</groupId>
+    	<artifactId>commons-io</artifactId>
+    	<version>2.4</version>
+	  </dependency>
+
+	  <dependency>
+	  	<groupId>org.eclipse.platform</groupId>
+	  	<artifactId>org.eclipse.core.jobs</artifactId>
+	  	<version>3.8.0</version>
+	  </dependency>
+	  <dependency>
+	  	<groupId>org.eclipse.platform</groupId>
+	  	<artifactId>org.eclipse.text</artifactId>
+	  	<version>3.6.0</version>
+	  </dependency>
+	  <dependency>
+	  	<groupId>org.eclipse.platform</groupId>
+	  	<artifactId>org.eclipse.osgi</artifactId>
+	  	<version>3.11.2</version>
+	  </dependency>
+	  <dependency>
+	  	<groupId>org.eclipse.platform</groupId>
+	  	<artifactId>org.eclipse.equinox.preferences</artifactId>
+	  	<version>3.6.1</version>
+	  </dependency>
+ </dependencies>
+   
+ <build>
+ 	<pluginManagement>
+ 		<plugins>
+ 			<!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+ 			<plugin>
+ 				<groupId>org.eclipse.m2e</groupId>
+ 				<artifactId>lifecycle-mapping</artifactId>
+ 				<version>1.0.0</version>
+ 				<configuration>
+ 					<lifecycleMappingMetadata>
+ 						<pluginExecutions>
+ 							<pluginExecution>
+ 								<pluginExecutionFilter>
+ 									<groupId>
+ 										org.apache.maven.plugins
+ 									</groupId>
+ 									<artifactId>
+ 										maven-javadoc-plugin
+ 									</artifactId>
+ 									<versionRange>
+ 										[2.10.1,)
+ 									</versionRange>
+ 									<goals>
+ 										<goal>javadoc</goal>
+ 									</goals>
+ 								</pluginExecutionFilter>
+ 								<action>
+ 									<ignore></ignore>
+ 								</action>
+ 							</pluginExecution>
+ 						</pluginExecutions>
+ 					</lifecycleMappingMetadata>
+ 				</configuration>
+ 			</plugin>
+ 		</plugins>
+ 	</pluginManagement>
+ </build>
+</project>
